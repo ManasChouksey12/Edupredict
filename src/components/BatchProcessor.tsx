@@ -3,6 +3,7 @@ import { Upload, Download, FileText, CheckCircle, AlertCircle } from 'lucide-rea
 import { StudentData, PredictionResult } from '../types';
 import { predictPerformance } from '../utils/mlModel';
 
+
 interface BatchProcessorProps {
   onBatchPredictions: (predictions: PredictionResult[]) => void;
 }
