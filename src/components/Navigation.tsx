@@ -13,6 +13,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
     { id: 'batch', label: 'Batch Processing', icon: Upload },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
   ];
+  
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
