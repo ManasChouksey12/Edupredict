@@ -4,6 +4,10 @@ import { PredictionResult } from '../types';
 import RecentPredictions from './RecentPredictions';
 import PerformanceChart from './PerformanceChart';
 
+
+
+
+
 interface DashboardProps {
   predictions: PredictionResult[];
 }
