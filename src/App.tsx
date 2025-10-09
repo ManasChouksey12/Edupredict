@@ -5,7 +5,7 @@ import PredictionForm from './components/PredictionForm';
 import Dashboard from './components/Dashboard';
 import BatchProcessor from './components/BatchProcessor';
 import Analytics from './components/Analytics';
-import { StudentData, PredictionResult } from './types';
+import { PredictionResult } from './types';
 
 function App() {
   const [activeTab, setActiveTab] = useState('prediction');
@@ -20,26 +20,28 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       <Header />
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       
-      <main className="container mx-auto px-4 py-8">
-        {activeTab === 'prediction' && (
-          <PredictionForm onPrediction={handleNewPrediction} />
-        )}
-        
-        {activeTab === 'dashboard' && (
-          <Dashboard predictions={predictions} />
-        )}
-        
-        {activeTab === 'batch' && (
-          <BatchProcessor onBatchPredictions={handleBatchPredictions} />
-        )}
-        
-        {activeTab === 'analytics' && (
-          <Analytics predictions={predictions} />
-        )}
+      <main className="container mx-auto px-6 py-8">
+        <div className="max-w-7xl mx-auto">
+          {activeTab === 'prediction' && (
+            <PredictionForm onPrediction={handleNewPrediction} />
+          )}
+          
+          {activeTab === 'dashboard' && (
+            <Dashboard predictions={predictions} />
+          )}
+          
+          {activeTab === 'batch' && (
+            <BatchProcessor onBatchPredictions={handleBatchPredictions} />
+          )}
+          
+          {activeTab === 'analytics' && (
+            <Analytics predictions={predictions} />
+          )}
+        </div>
       </main>
     </div>
   );

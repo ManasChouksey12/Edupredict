@@ -1,145 +1,137 @@
 import { StudentData, PredictionResult } from '../types';
 
-// Simulated ML model coefficients based on realistic education data
-const MODEL_WEIGHTS = {
-  attendanceRate: 0.25,
-  quizAverage: 0.20,
-  assignmentAverage: 0.20,
-  finalProjectScore: 0.15,
-  participationLevel: 0.10,
-  studyHours: 0.08,
-  previousGPA: 0.12,
-  intercept: 0.5
+// Helper: safe number parse and clamp
+const toNum = (v: unknown, fallback = 0): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 };
 
-// Normalize scores to 0-1 range for consistent weighting
-const normalizeScore = (value: number, max: number): number => {
-  return Math.max(0, Math.min(1, value / max));
-};
+// Deterministic prediction function - NO randomness
+export const predictPerformance = (student: StudentData): PredictionResult => {
+  // Extract inputs with safe parsing
+  const attendance = toNum(student.attendanceRate, 0); // 0-100
 
-// Calculate predicted GPA using weighted linear combination
-const calculateGPA = (student: StudentData): number => {
-  const normalizedFactors = {
-    attendanceRate: normalizeScore(student.attendanceRate, 100),
-    quizAverage: normalizeScore(student.quizAverage, 100),
-    assignmentAverage: normalizeScore(student.assignmentAverage, 100),
-    finalProjectScore: normalizeScore(student.finalProjectScore, 100),
-    participationLevel: normalizeScore(student.participationLevel, 10),
-    studyHours: normalizeScore(student.studyHours, 40),
-    previousGPA: student.previousGPA ? normalizeScore(student.previousGPA, 4) : 0.75
+  // Assignments array (support 3-5), each out of 50
+  const assignments = Array.isArray(student.assignments)
+    ? student.assignments.map((a: unknown) => toNum(a, 0))
+    : [];
+
+  const assignmentCount = Math.max(0, assignments.length);
+  const assignmentSum = assignments.reduce((s, x) => s + x, 0);
+  const assignmentAvgPercent =
+    assignmentCount > 0 ? (assignmentSum / (assignmentCount * 10)) * 100 : 0;
+
+  // Term assessments (out of 20)
+  const term1Percent = (toNum(student.termAssessment1, 0) / 20) * 100;
+  const term2Percent = (toNum(student.termAssessment2, 0) / 20) * 100;
+
+  // Lab marks
+  const labObtained = toNum(student.labMarks, 0);
+  const labTotal = toNum(student.labTotal, 30); // default 30 if not provided
+  const labPercent = labTotal > 0 ? (labObtained / labTotal) * 100 : 0;
+
+  // Teacher remark (0-10)
+  const teacherPercent = (toNum(student.teacherRemark, 0) / 10) * 100;
+
+  // Previous SGPA (0-10)
+  const prevPercent = (toNum(student.previousSGPA, 0) / 10) * 100;
+
+  // Weights (sum to 1.00)
+  const w = {
+    attendance: 0.25,
+    assignment: 0.20,
+    term1: 0.15,
+    term2: 0.15,
+    lab: 0.10,
+    teacher: 0.08,
+    previous: 0.07,
   };
 
-  let weightedSum = MODEL_WEIGHTS.intercept;
-  
-  Object.entries(normalizedFactors).forEach(([factor, value]) => {
-    weightedSum += value * MODEL_WEIGHTS[factor as keyof typeof MODEL_WEIGHTS];
-  });
+  // Weighted percentage (0-100) - DETERMINISTIC
+  const weightedPercent =
+    attendance * w.attendance +
+    assignmentAvgPercent * w.assignment +
+    term1Percent * w.term1 +
+    term2Percent * w.term2 +
+    labPercent * w.lab +
+    teacherPercent * w.teacher +
+    prevPercent * w.previous;
 
-  // Convert to 4.0 scale and add some realistic variance
-  const baseGPA = weightedSum * 4.0;
-  const variance = (Math.random() - 0.5) * 0.3; // ±0.15 variance
-  
-  return Math.max(0, Math.min(4.0, baseGPA + variance));
-};
+  // Convert to CGPA (0-10) deterministically
+  const rawCgpa = (weightedPercent / 100) * 10;
+  const predictedCGPA = Math.max(0, Math.min(10, Number(rawCgpa.toFixed(2))));
 
-// Calculate predicted final exam score
-const calculateFinalExam = (student: StudentData, predictedGPA: number): number => {
-  // Base prediction on GPA and historical performance
-  const performanceAverage = (student.quizAverage + student.assignmentAverage) / 2;
-  const gpaFactor = (predictedGPA / 4.0) * 100;
-  
-  // Weighted combination with some randomness
-  const baseScore = (performanceAverage * 0.6) + (gpaFactor * 0.4);
-  const variance = (Math.random() - 0.5) * 10; // ±5 point variance
-  
-  return Math.max(0, Math.min(100, baseScore + variance));
-};
+  // Final exam score (0-100) deterministic
+  const finalExamScore = Math.max(
+    0,
+    Math.min(100, Math.round(predictedCGPA * 10))
+  );
 
-// Determine risk level based on multiple factors
-const calculateRiskLevel = (student: StudentData, predictedGPA: number): 'low' | 'medium' | 'high' => {
+  // Deterministic Confidence: base 70 -> 98 based on how many required fields are filled
+  const requiredFields = [
+    'attendanceRate',
+    'assignments',
+    'termAssessment1',
+    'termAssessment2',
+    'labMarks',
+    'labTotal',
+    'teacherRemark',
+  ];
+  let filled = 0;
+  if (attendance > 0) filled++;
+  if (assignmentCount >= 3) filled++; // require at least 3 assignments to consider "filled"
+  if (toNum(student.termAssessment1, -1) >= 0) filled++;
+  if (toNum(student.termAssessment2, -1) >= 0) filled++;
+  if (labTotal > 0 && labObtained >= 0) filled++;
+  if (toNum(student.teacherRemark, -1) >= 0) filled++;
+
+  const completeness = Math.min(1, filled / requiredFields.length);
+  const confidence = Math.round(70 + completeness * 28) / 100; // deterministic range 0.70-0.98
+
+  // Risk factors (use normalized thresholds)
   const riskFactors = {
-    lowAttendance: student.attendanceRate < 75,
-    lowQuizScores: student.quizAverage < 70,
-    lowAssignments: student.assignmentAverage < 70,
-    lowParticipation: student.participationLevel < 5,
-    lowStudyTime: student.studyHours < 10,
-    lowPredictedGPA: predictedGPA < 2.0
+    lowAttendance: attendance < 75,
+    lowAssignments: assignmentAvgPercent < 70,
+    lowTA1: term1Percent < 60,
+    lowTA2: term2Percent < 60,
+    lowLab: labPercent < 60,
+    lowPrevious: prevPercent < 50,
   };
-
   const riskCount = Object.values(riskFactors).filter(Boolean).length;
 
-  if (riskCount >= 4 || predictedGPA < 1.5) return 'high';
-  if (riskCount >= 2 || predictedGPA < 2.5) return 'medium';
-  return 'low';
-};
+  let riskLevel: 'low' | 'medium' | 'high' = 'low';
+  if (riskCount >= 4 || predictedCGPA < 4.0) riskLevel = 'high';
+  else if (riskCount >= 2 || predictedCGPA < 6.5) riskLevel = 'medium';
+  else riskLevel = 'low';
 
-// Calculate model confidence based on data quality
-const calculateConfidence = (student: StudentData): number => {
-  let confidenceScore = 0.85; // Base confidence
-  
-  // Adjust based on data completeness and consistency
-  if (student.previousGPA) confidenceScore += 0.05;
-  if (student.attendanceRate >= 80) confidenceScore += 0.03;
-  if (student.studyHours >= 15) confidenceScore += 0.02;
-  
-  // Add some realistic variance
-  const variance = (Math.random() - 0.5) * 0.1;
-  
-  return Math.max(0.7, Math.min(0.98, confidenceScore + variance));
-};
-
-// Generate personalized recommendations
-const generateRecommendations = (student: StudentData, riskLevel: string): string[] => {
+  // Recommendations: deterministic based on risk factors
   const recommendations: string[] = [];
+  if (riskFactors.lowAttendance) recommendations.push('Improve attendance to 75%+');
+  if (riskFactors.lowAssignments)
+    recommendations.push('Improve assignment quality and submission rates');
+  if (riskFactors.lowTA1 || riskFactors.lowTA2)
+    recommendations.push('Focus on term assessment revision and practice tests');
+  if (riskFactors.lowLab) recommendations.push('Improve practical/lab performance');
+  if (predictedCGPA < 5) recommendations.push('Consider extra tutoring / mentoring');
 
-  if (student.attendanceRate < 85) {
-    recommendations.push('Improve attendance rate - aim for 90%+ to significantly boost performance');
-  }
-  
-  if (student.quizAverage < 80) {
-    recommendations.push('Focus on quiz preparation and review - consider study groups or tutoring');
-  }
-  
-  if (student.assignmentAverage < 85) {
-    recommendations.push('Maintain consistent assignment quality - review feedback and ask for help when needed');
-  }
-  
-  if (student.participationLevel < 7) {
-    recommendations.push('Increase class participation - active engagement improves understanding and grades');
-  }
-  
-  if (student.studyHours < 15) {
-    recommendations.push('Increase study time to 20+ hours per week for optimal performance');
-  }
-  
-  if (riskLevel === 'high') {
-    recommendations.push('Schedule immediate meeting with academic advisor for intervention plan');
-    recommendations.push('Consider additional academic support services and resources');
-  } else if (riskLevel === 'medium') {
-    recommendations.push('Monitor progress closely and implement improvement strategies early');
+  if (recommendations.length === 0) {
+    recommendations.push('Continue current performance - maintain consistent study habits and engagement');
   }
 
-  return recommendations.length > 0 ? recommendations : [
-    'Continue current performance - maintain consistent study habits and engagement'
-  ];
-};
-
-// Main prediction function
-export const predictPerformance = (student: StudentData): PredictionResult => {
-  const predictedGPA = calculateGPA(student);
-  const predictedFinalExam = calculateFinalExam(student, predictedGPA);
-  const riskLevel = calculateRiskLevel(student, predictedGPA);
-  const confidence = calculateConfidence(student);
-  const recommendations = generateRecommendations(student, riskLevel);
+  // Update student with calculated assignment average
+  const studentWithAverage = {
+    ...student,
+    assignmentAverage: assignmentAvgPercent
+  };
 
   return {
-    student,
-    predictedGPA,
-    predictedFinalExam,
+    student: studentWithAverage,
+    predictedCGPA,
+    predictedFinalExam: finalExamScore,
     riskLevel,
     confidence,
     recommendations,
-    timestamp: new Date()
+    timestamp: new Date(),
   };
 };
 

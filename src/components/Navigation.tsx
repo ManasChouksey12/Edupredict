@@ -13,11 +13,10 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
     { id: 'batch', label: 'Batch Processing', icon: Upload },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
   ];
-  
 
   return (
-    <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
-      <div className="container mx-auto px-4">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <div className="container mx-auto px-6">
         <div className="flex space-x-8">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
@@ -26,7 +25,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
               className={`flex items-center space-x-2 py-4 px-2 border-b-2 font-medium text-sm transition-colors duration-200 ${
                 activeTab === id
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Icon className="w-4 h-4" />

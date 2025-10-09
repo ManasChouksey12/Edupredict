@@ -1,83 +1,79 @@
-# Student Performance Prediction System
+# 🎓 EduPredict - Student Performance Prediction System
 
-A comprehensive AI-powered web application for predicting student academic performance and identifying at-risk students. Built with React, TypeScript, and Tailwind CSS, featuring machine learning algorithms to analyze student data and provide actionable insights.
-
-<img src="https://raw.githubusercontent.com/Thoyyibhans/Student-Performance-Prediction-System/main/images.png">
-
-
-## 🌟 Features
-
-### Core Functionality
-- **Single Student Prediction**: Input individual student data for instant performance predictions
-- **Batch Processing**: Upload CSV files to analyze multiple students simultaneously
-- **Interactive Dashboard**: Real-time analytics and performance metrics
-- **Advanced Analytics**: Comprehensive insights with risk assessment and trend analysis
-
-### Machine Learning Capabilities
-- **GPA Prediction**: Accurate prediction of student GPA based on multiple factors
-- **Final Exam Score Prediction**: Forecasting final examination performance
-- **Risk Assessment**: Automatic identification of at-risk students (high/medium/low risk)
-- **Confidence Scoring**: Model confidence levels for each prediction
-- **Personalized Recommendations**: AI-generated suggestions for student improvement
-
-### Data Analysis Features
-- **Performance Distribution Charts**: Visual representation of grade distributions
-- **Risk Level Analytics**: Breakdown of student risk categories
-- **Factor Impact Analysis**: Understanding which factors most influence performance
-- **Historical Tracking**: Monitor prediction trends over time
+A **deterministic AI-powered web application** for predicting student academic performance using **CGPA (0-10 scale)** and identifying at-risk students. Built with React, TypeScript, and Tailwind CSS.
 
 ## 🚀 Live Demo
 
-Visit the live application: [https://smartgpa.netlify.app/](https://smartgpa.netlify.app/)
+**[https://smartgpa.netlify.app/](https://smartgpa.netlify.app/)**
 
-## 📊 Input Parameters
+## 🌟 Key Features
 
-The system analyzes the following student factors:
+- **Single Student Prediction**: Individual student CGPA predictions
+- **Batch Processing**: CSV upload for multiple students  
+- **Interactive Dashboard**: Real-time analytics and metrics
+- **Risk Assessment**: Automatic identification of at-risk students
+- **100% Deterministic**: Consistent, reproducible results
+- **Export Capabilities**: Download results in CSV format
 
-- **Attendance Rate** (0-100%): Class attendance percentage
-- **Quiz Average** (0-100): Average score across all quizzes
-- **Assignment Average** (0-100): Average assignment performance
-- **Final Project Score** (0-100): Major project evaluation
-- **Participation Level** (1-10): Classroom engagement rating
-- **Study Hours** (per week): Time dedicated to studying
-- **Previous GPA** (0-4.0): Historical academic performance (optional)
+## 📋 Input Parameters
+
+The system analyzes **7 key academic factors** using a weighted regression model:
+
+| **Factor** | **Scale** | **Weight** | **Description** |
+|------------|-----------|------------|-----------------|
+| **Attendance Rate** | 0-100% | 25% | Class attendance percentage |
+| **Assignment Average** | 0-100% | 20% | Average of 3-5 assignments (each out of 10) |
+| **Term Assessment 1** | 0-20 | 15% | Mid-term assessment score |
+| **Term Assessment 2** | 0-20 | 15% | Second term assessment score |
+| **Lab Marks** | Variable | 10% | Practical/lab performance (out of 20 or 30) |
+| **Teacher Remark** | 0-10 | 8% | Instructor evaluation score |
+| **Previous SGPA** | 0-10 | 7% | Historical academic performance (optional) |
+
+## 🧮 Machine Learning Model
+
+### **Algorithm: Deterministic Weighted Linear Regression**
+
+The system uses a **100% deterministic** weighted linear regression model:
+
+```typescript
+// Step 1: Normalize all inputs to percentage scale (0-100%)
+const normalizedScore = (
+  attendanceRate * 0.25 +
+  assignmentAverage * 0.20 +
+  (termAssessment1 / 20) * 100 * 0.15 +
+  (termAssessment2 / 20) * 100 * 0.15 +
+  (labMarks / labTotal) * 100 * 0.10 +
+  (teacherRemark / 10) * 100 * 0.08 +
+  (previousSGPA / 10) * 100 * 0.07
+);
+
+// Step 2: Convert to CGPA (0-10 scale)
+const predictedCGPA = (normalizedScore / 100) * 10;
+
+// Step 3: Calculate final exam score
+const finalExamScore = Math.round(predictedCGPA * 10);
+```
+
+### **Risk Assessment**
+
+| **Risk Level** | **Criteria** | **CGPA Threshold** |
+|----------------|--------------|-------------------|
+| **🔴 High Risk** | CGPA < 4.0 OR 4+ risk factors | < 4.0 |
+| **🟡 Medium Risk** | CGPA < 6.5 OR 2+ risk factors | 4.0 - 6.4 |
+| **🟢 Low Risk** | Good performance across factors | ≥ 6.5 |
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: React 18 with TypeScript
-- **Styling**: Tailwind CSS for responsive design
-- **Icons**: Lucide React for consistent iconography
-- **Charts**: Chart.js with React integration
-- **File Processing**: PapaParse for CSV handling
-- **Build Tool**: Vite for fast development and building
-- **Deployment**: Netlify for hosting
-
-## 📁 Project Structure
-
-```
-src/
-├── components/           
-│   ├── Analytics.tsx    
-│   ├── BatchProcessor.tsx 
-│   ├── Dashboard.tsx   
-│   ├── Header.tsx       
-│   ├── Navigation.tsx   
-│   ├── PerformanceChart.tsx 
-│   ├── PredictionForm.tsx 
-│   └── RecentPredictions.tsx 
-├── types/              
-│   └── index.ts        
-├── utils/              
-│   └── mlModel.ts      
-├── App.tsx            
-├── main.tsx           
-└── index.css         
-```
+- **React 18.3.1**: Modern React with TypeScript
+- **TypeScript 5.5.3**: Full type safety
+- **Tailwind CSS 3.4.1**: Responsive design
+- **Vite 5.4.2**: Fast build tool
+- **Chart.js 4.4.0**: Interactive charts
+- **PapaParse 5.4.1**: CSV processing
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - Node.js (version 16 or higher)
 - npm or yarn package manager
 
@@ -85,8 +81,8 @@ src/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/student-performance-prediction.git
-   cd student-performance-prediction
+   git clone https://github.com/yourusername/edupredict.git
+   cd edupredict
    ```
 
 2. **Install dependencies**
@@ -100,112 +96,114 @@ src/
    ```
 
 4. **Open your browser**
-   Navigate to `http://localhost:5173` to view the application
+   Navigate to `http://localhost:5173`
 
-### Building for Production
+### Build for Production
 
 ```bash
 npm run build
 ```
 
-The built files will be in the `dist` directory, ready for deployment.
+## 📊 Usage Guide
 
-## 📈 Machine Learning Model
+### 1️⃣ Single Student Prediction
+1. Navigate to "Single Prediction" tab
+2. Enter student information (name, attendance, assignments, etc.)
+3. Click "Predict Performance"
+4. View predicted CGPA, final exam score, and risk level
 
-### Algorithm
-The system uses a sophisticated weighted linear regression model that considers multiple academic and behavioral factors:
+### 2️⃣ Batch Processing
+1. Go to "Batch Processing" tab
+2. Download sample CSV template
+3. Fill in student data following the format
+4. Upload CSV file
+5. Download results with all predictions
 
-- **Attendance Rate**: 25% weight
-- **Quiz Average**: 20% weight  
-- **Assignment Average**: 20% weight
-- **Final Project Score**: 15% weight
-- **Previous GPA**: 12% weight
-- **Participation Level**: 10% weight
-- **Study Hours**: 8% weight
-
-### Model Performance
-- **R² Score**: 0.923 (92.3% variance explained)
-- **Mean Absolute Error**: 0.187
-- **Mean Squared Error**: 0.045
-- **Overall Accuracy**: 95.2%
-
-### Risk Assessment
-Students are categorized into risk levels based on:
-- **High Risk**: Multiple concerning factors or predicted GPA < 1.5
-- **Medium Risk**: Some concerning factors or predicted GPA < 2.5
-- **Low Risk**: Strong performance indicators
-
-## 📊 Usage Examples
-
-### Single Student Prediction
-1. Navigate to the "Single Prediction" tab
-2. Enter student information in the form
-3. Click "Predict Performance" to get instant results
-4. View predicted GPA, final exam score, and risk assessment
-5. Review personalized recommendations
-
-### Batch Processing
-1. Go to the "Batch Processing" tab
-2. Download the sample CSV template
-3. Fill in your student data following the format
-4. Upload the CSV file
-5. Download the results with all predictions
-
-### Analytics Dashboard
-1. Visit the "Analytics" tab after making predictions
-2. View comprehensive performance metrics
-3. Analyze risk distribution across students
-4. Review factor impact analysis
-
-## 🎯 Use Cases
-
-### Educational Institutions
-- **Early Intervention**: Identify at-risk students before final exams
-- **Resource Allocation**: Focus support on students who need it most
-- **Performance Monitoring**: Track academic trends across classes
-- **Data-Driven Decisions**: Make informed choices about curriculum and support
-
-### Teachers and Educators
-- **Student Assessment**: Understand individual student needs
-- **Parent Communication**: Provide data-backed progress reports
-- **Curriculum Planning**: Adjust teaching strategies based on predictions
-- **Success Tracking**: Monitor improvement over time
-
-### Academic Researchers
-- **Performance Analysis**: Study factors affecting student success
-- **Intervention Studies**: Measure effectiveness of support programs
-- **Predictive Modeling**: Develop improved prediction algorithms
-- **Educational Insights**: Understand learning patterns and trends
-
-## 🔧 Customization
-
-### Adding New Factors
-To include additional prediction factors:
-
-1. Update the `StudentData` interface in `src/types/index.ts`
-2. Modify the form in `src/components/PredictionForm.tsx`
-3. Adjust the model weights in `src/utils/mlModel.ts`
-4. Update CSV processing in `src/components/BatchProcessor.tsx`
-
-### Styling Modifications
-The application uses Tailwind CSS for styling. Customize the appearance by:
-- Modifying color schemes in component files
-- Updating the Tailwind configuration in `tailwind.config.js`
-- Adding custom CSS in `src/index.css`
+### 3️⃣ Analytics Dashboard
+1. Visit "Analytics" tab after making predictions
+2. View performance metrics and distributions
+3. Analyze risk levels and factor impacts
 
 ## 📝 CSV Format
 
-For batch processing, use this CSV format:
-
 ```csv
-name,attendanceRate,quizAverage,assignmentAverage,finalProjectScore,participationLevel,studyHours,previousGPA
-John Smith,85,78,82,88,7,20,3.2
-Sarah Johnson,92,88,90,94,9,25,3.8
+name,attendanceRate,assignment1,assignment2,assignment3,assignment4,assignment5,termAssessment1,termAssessment2,labMarks,labTotal,teacherRemark,remarkCaption,previousSGPA
+John Smith,85,9,8.5,9.5,9,,18,19,25,30,9,Excellent work,8.2
+Sarah Johnson,92,9.5,9,9.5,10,8.5,19,20,28,30,10,Outstanding performance,8.8
 ```
 
-## 🤝 Contributing
+### Field Specifications
 
-We welcome contributions! Please follow these steps:
+| **Field** | **Type** | **Range** | **Required** |
+|-----------|----------|-----------|--------------|
+| `name` | String | - | ✅ |
+| `attendanceRate` | Number | 0-100 | ✅ |
+| `assignment1-5` | Number | 0-10 | ✅ (min 3) |
+| `termAssessment1` | Number | 0-20 | ✅ |
+| `termAssessment2` | Number | 0-20 | ✅ |
+| `labMarks` | Number | 0-30 | ✅ |
+| `labTotal` | Number | 20 or 30 | ✅ |
+| `teacherRemark` | Number | 0-10 | ✅ |
+| `remarkCaption` | String | - | ❌ |
+| `previousSGPA` | Number | 0-10 | ❌ |
+
+## 🧠 AI/ML Technical Implementation
+
+### **TypeScript Benefits**
+- **Type Safety**: Compile-time error prevention
+- **Data Integrity**: Structured interfaces for all data
+- **Performance**: Optimized calculations with memoization
+- **Maintainability**: Clean, readable code architecture
+
+### **Core Prediction Algorithm**
+```typescript
+export const predictPerformance = (student: StudentData): PredictionResult => {
+  // Calculate assignment average
+  const assignmentAvgPercent = (assignmentSum / (assignmentCount * 10)) * 100;
+  
+  // Apply weighted formula
+  const weightedPercent = 
+    student.attendanceRate * 0.25 +
+    assignmentAvgPercent * 0.20 +
+    (student.termAssessment1 / 20) * 100 * 0.15 +
+    (student.termAssessment2 / 20) * 100 * 0.15 +
+    (student.labMarks / student.labTotal) * 100 * 0.10 +
+    (student.teacherRemark / 10) * 100 * 0.08 +
+    ((student.previousSGPA || 7.5) / 10) * 100 * 0.07;
+  
+  // Convert to CGPA and calculate results
+  const predictedCGPA = (weightedPercent / 100) * 10;
+  const finalExamScore = Math.round(predictedCGPA * 10);
+  const riskLevel = calculateRiskLevel(student, predictedCGPA);
+  
+  return { predictedCGPA, finalExamScore, riskLevel, ... };
+};
+```
+
+### **Data Validation**
+```typescript
+interface StudentData {
+  name: string;
+  attendanceRate: number;        // 0-100%
+  assignments: number[];         // 3-5 assignments (0-10 each)
+  termAssessment1: number;       // 0-20
+  termAssessment2: number;       // 0-20
+  labMarks: number;              // Obtained marks
+  labTotal: number;              // Total marks (20 or 30)
+  teacherRemark: number;         // 0-10
+  remarkCaption?: string;        // Optional
+  previousSGPA?: number;         // 0-10 (optional)
+}
+```
+
+## 🎯 Use Cases
+
+- **Educational Institutions**: Early intervention and resource allocation
+- **Teachers**: Student assessment and parent communication
+- **Academic Researchers**: Performance analysis and intervention studies
+- **Administrative Staff**: Enrollment planning and support services
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -213,30 +211,17 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Development Guidelines
-- Follow TypeScript best practices
-- Maintain consistent code formatting
-- Add comments for complex logic
-- Update documentation for new features
-- Test thoroughly before submitting
-
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**.
 
 ## 🙏 Acknowledgments
 
 - **React Team** for the excellent framework
 - **Tailwind CSS** for the utility-first CSS framework
-- **Lucide** for the beautiful icon set
-- **Vite** for the fast build tool
+- **TypeScript Team** for type safety
 - **Educational Research Community** for insights into student performance factors
 
-## 🔮 Future Enhancements
+---
 
-- **Real-time Data Integration**: Connect with student information systems
-- **Advanced ML Models**: Implement neural networks and ensemble methods
-- **Mobile Application**: Native iOS and Android apps
-- **Multi-language Support**: Internationalization for global use
-- **Advanced Visualizations**: 3D charts and interactive dashboards
-- **API Integration**: RESTful API for third-party integrations
+**🎓 EduPredict - Empowering Education Through Predictive Analytics**

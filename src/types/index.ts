@@ -2,17 +2,20 @@ export interface StudentData {
   id?: string;
   name: string;
   attendanceRate: number;
-  quizAverage: number;
-  assignmentAverage: number;
-  finalProjectScore: number;
-  participationLevel: number;
-  studyHours: number;
-  previousGPA?: number;
+  assignments: number[]; // 3-5 assignments, each out of 10
+  assignmentAverage: number; // calculated automatically
+  termAssessment1: number; // out of 20
+  termAssessment2: number; // out of 20
+  labMarks: number; // obtained marks
+  labTotal: number; // total marks (20 or 30)
+  teacherRemark: number; // out of 10
+  remarkCaption?: string; // optional text
+  previousSGPA?: number; // out of 10, optional
 }
 
 export interface PredictionResult {
   student: StudentData;
-  predictedGPA: number;
+  predictedCGPA: number;
   predictedFinalExam: number;
   riskLevel: 'low' | 'medium' | 'high';
   confidence: number;
