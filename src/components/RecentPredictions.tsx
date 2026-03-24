@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, User, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Clock, User, TrendingUp, AlertTriangle, CheckCircle, Calendar } from 'lucide-react';
 import { PredictionResult } from '../types';
 
 interface RecentPredictionsProps {
@@ -9,10 +9,10 @@ interface RecentPredictionsProps {
 const RecentPredictions: React.FC<RecentPredictionsProps> = ({ predictions }) => {
   const getRiskColor = (level: string) => {
     switch (level) {
-      case 'high': return 'text-red-600 bg-red-50';
-      case 'medium': return 'text-yellow-600 bg-yellow-50';
-      case 'low': return 'text-green-600 bg-green-50';
-      default: return 'text-slate-600 bg-slate-50';
+      case 'high': return 'bg-gradient-to-r from-red-500 to-pink-500 text-white';
+      case 'medium': return 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white';
+      case 'low': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white';
+      default: return 'bg-gradient-to-r from-gray-500 to-slate-500 text-white';
     }
   };
 
@@ -26,92 +26,77 @@ const RecentPredictions: React.FC<RecentPredictionsProps> = ({ predictions }) =>
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 px-8 py-6">
-        <div className="flex items-center space-x-4">
-          <div className="bg-white/20 p-3 rounded-xl">
-            <Clock className="w-7 h-7 text-white" />
+    <div className="rounded-2xl border border-white/10 bg-slate-900/35 backdrop-blur-md overflow-hidden">
+      <div className="border-b border-white/10 px-6 sm:px-8 py-5 bg-slate-950/40">
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 bg-indigo-500/20 rounded-xl flex items-center justify-center ring-1 ring-indigo-400/30">
+            <Clock className="w-5 h-5 text-indigo-300" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Recent Predictions</h2>
-            <p className="text-teal-100 text-sm">Latest student performance analyses</p>
+            <h2 className="text-lg font-semibold text-white tracking-tight">Recent activity</h2>
+            <p className="text-slate-500 text-sm">Newest predictions in this browser session</p>
           </div>
         </div>
       </div>
-      
-      <div className="p-8">
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/30">
-                <th className="text-left py-4 px-6 font-bold text-slate-700">Student</th>
-                <th className="text-left py-4 px-6 font-bold text-slate-700">Predicted CGPA</th>
-                <th className="text-left py-4 px-6 font-bold text-slate-700">Final Exam</th>
-                <th className="text-left py-4 px-6 font-bold text-slate-700">Risk Level</th>
-                <th className="text-left py-4 px-6 font-bold text-slate-700">Confidence</th>
-                <th className="text-left py-4 px-6 font-bold text-slate-700">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {predictions.map((prediction, index) => (
-                <tr key={index} className="border-b border-slate-100 hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-teal-50/30 transition-all duration-200">
-                  <td className="py-5 px-6">
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-gradient-to-br from-blue-100 to-teal-100 p-2 rounded-lg">
-                        <User className="w-4 h-4 text-blue-600" />
+      <div className="p-6 sm:p-8">
+        {predictions.length > 0 ? (
+          <div className="space-y-4">
+            {predictions.map((prediction, index) => (
+              <div
+                key={index}
+                className="rounded-xl border border-slate-600/40 bg-slate-950/30 p-4 sm:p-5 hover:border-slate-500/50 transition-colors"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shrink-0">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white text-base">{prediction.student.name}</h4>
+                      <div className="flex items-center space-x-2 text-sm text-slate-500 mt-0.5">
+                        <Calendar className="w-4 h-4" />
+                        <span>{prediction.timestamp.toLocaleDateString()}</span>
                       </div>
-                      <span className="font-semibold text-slate-800">
-                        {prediction.student.name}
-                      </span>
                     </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className="bg-blue-50 px-3 py-2 rounded-lg inline-block">
-                      <span className="text-lg font-bold text-blue-700">
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                    <div className="text-center min-w-[4rem]">
+                      <div className="text-xl font-bold text-sky-300 tabular-nums">
                         {prediction.predictedCGPA.toFixed(2)}
-                      </span>
-                      <span className="text-xs text-blue-500 ml-1">/10</span>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">CGPA</div>
                     </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className="bg-green-50 px-3 py-2 rounded-lg inline-block">
-                      <span className="text-lg font-bold text-green-700">
+
+                    <div className="text-center min-w-[4rem]">
+                      <div className="text-xl font-bold text-emerald-300 tabular-nums">
                         {prediction.predictedFinalExam.toFixed(0)}%
-                      </span>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Exam</div>
                     </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className={`inline-flex items-center space-x-2 px-3 py-2 rounded-xl text-sm font-bold ${getRiskColor(prediction.riskLevel)}`}>
+                    
+                    <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold ${getRiskColor(prediction.riskLevel)}`}>
                       {getRiskIcon(prediction.riskLevel)}
                       <span className="capitalize">{prediction.riskLevel}</span>
                     </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <div className="bg-purple-50 px-3 py-2 rounded-lg inline-block">
-                      <span className="font-bold text-purple-700">
+                    
+                    <div className="text-center min-w-[4rem]">
+                      <div className="text-lg font-bold text-violet-300 tabular-nums">
                         {(prediction.confidence * 100).toFixed(0)}%
-                      </span>
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Complete</div>
                     </div>
-                  </td>
-                  <td className="py-5 px-6">
-                    <span className="text-slate-600 font-medium">
-                      {prediction.timestamp.toLocaleDateString()}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {predictions.length === 0 && (
-          <div className="text-center py-16">
-            <div className="bg-slate-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Clock className="w-10 h-10 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">No Predictions Yet</h3>
-            <p className="text-slate-600 max-w-md mx-auto">Start by making your first prediction to see recent analyses here!</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-14">
+            <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-300 mb-2">Nothing here yet</h3>
+            <p className="text-slate-500 text-sm max-w-sm mx-auto">Predict or batch import to populate this list.</p>
           </div>
         )}
       </div>

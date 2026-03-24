@@ -8,12 +8,12 @@ A **deterministic AI-powered web application** for predicting student academic p
 
 ## 🌟 Key Features
 
-- **Single Student Prediction**: Individual student CGPA predictions
-- **Batch Processing**: CSV upload for multiple students  
-- **Interactive Dashboard**: Real-time analytics and metrics
-- **Risk Assessment**: Automatic identification of at-risk students
-- **100% Deterministic**: Consistent, reproducible results
-- **Export Capabilities**: Download results in CSV format
+- **Single student prediction** — CGPA, exam-style score, risk, recommendations
+- **Student dashboard** — Chart.js trends, risk mix, CGPA bands, session KPIs
+- **Ask (doubt solver)** — Instant on-device answers for common questions; optional Gemini (3 cloud replies per browser session when a key is set)
+- **Batch CSV** — Bulk run + export
+- **Analytics** — Deeper factor breakdowns + on-device session insights
+- **Deterministic core model** — Same inputs, same outputs
 
 ## 📋 Input Parameters
 
@@ -98,6 +98,12 @@ const finalExamScore = Math.round(predictedCGPA * 10);
 4. **Open your browser**
    Navigate to `http://localhost:5173`
 
+### Ask tab / Gemini (optional)
+
+- **On-device**: Many questions (formula, how to improve, risk meaning) are answered instantly with **no API** and **no quota**.
+- **Cloud tutor**: Add `VITE_GEMINI_API_KEY` in `.env` (see `.env.example`). The app allows **3 Gemini replies per browser session** to stay within typical free-tier limits; refresh the tab to reset the session counter.
+- The key ships in the browser bundle (demo only). For production, use a backend or strict API key restrictions.
+
 ### Build for Production
 
 ```bash
@@ -111,6 +117,12 @@ npm run build
 2. Enter student information (name, attendance, assignments, etc.)
 3. Click "Predict Performance"
 4. View predicted CGPA, final exam score, and risk level
+5. Read **Structured insights** on the same page (on-device). Use the **Ask** tab for interactive doubts.
+
+### Dashboard & insights
+
+- **Dashboard**: Charts (CGPA trend, risk doughnut, grade bands) and session metrics.
+- **Predict / Analytics / Batch**: Short **insights** blocks are generated on-device from your numbers.
 
 ### 2️⃣ Batch Processing
 1. Go to "Batch Processing" tab

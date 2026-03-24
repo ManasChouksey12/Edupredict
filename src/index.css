@@ -1,3 +1,78 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  * {
+    font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  }
+
+  body {
+    background: linear-gradient(165deg, #0f172a 0%, #1e1b4b 38%, #312e81 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-xl;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  }
+  
+  .floating-card {
+    @apply transform transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl;
+  }
+  
+  .input-modern {
+    @apply bg-white/80 backdrop-blur-sm border-2 border-gray-200/50 rounded-xl px-4 py-3 
+           focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/50 
+           transition-all duration-200 placeholder-gray-400;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-8 
+           rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200
+           focus:ring-4 focus:ring-blue-200;
+  }
+  
+  .stat-card {
+    @apply bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/30
+           hover:bg-white hover:shadow-xl transition-all duration-300;
+  }
+
+  /* Scoped override for legacy glass UI inside light teacher workspace */
+  .workspace-light .glass-card {
+    @apply bg-white border border-slate-200 shadow-sm backdrop-blur-none;
+  }
+
+  .workspace-light .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-500 text-white shadow-none hover:scale-100;
+  }
+
+  .workspace-light .input-modern {
+    @apply bg-white border border-slate-300 text-slate-800 placeholder:text-slate-400
+           focus:border-indigo-500 focus:ring-indigo-100;
+  }
+
+  .workspace-light .stat-card {
+    @apply bg-white border border-slate-200 shadow-sm hover:shadow-md;
+  }
+
+  .workspace-light [class*='text-white'] {
+    color: #0f172a !important;
+  }
+
+  .workspace-light [class*='text-blue-200'] {
+    color: #64748b !important;
+  }
+
+  .workspace-light [class*='bg-white/10'],
+  .workspace-light [class*='bg-white/[0.06]'],
+  .workspace-light [class*='bg-white/[0.09]'] {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+  }
+}

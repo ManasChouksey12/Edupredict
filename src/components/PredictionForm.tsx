@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { User, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { User, TrendingUp, AlertTriangle, CheckCircle, Target } from 'lucide-react';
 import { StudentData, PredictionResult } from '../types';
 import { predictPerformance } from '../utils/mlModel';
+import { buildLocalSingleStudentInsight } from '../utils/localAssistant';
+import InsightsPanel from './InsightsPanel';
 
 interface PredictionFormProps {
   onPrediction: (result: PredictionResult) => void;
@@ -98,299 +100,345 @@ const PredictionForm: React.FC<PredictionFormProps> = ({ onPrediction }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200">
-        <div className="border-b border-gray-200 px-8 py-6">
-          <div className="flex items-center space-x-3">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <User className="w-6 h-6 text-white" />
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="glass-card rounded-3xl p-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-purple-500/20 rounded-full blur-3xl"></div>
+        <div className="relative z-10">
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
+              <User className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Student Performance Prediction</h2>
-              <p className="text-gray-600 text-sm">Enter student data for AI-powered CGPA prediction</p>
+              <h1 className="text-3xl font-bold text-white mb-1">Performance Prediction</h1>
+              <p className="text-blue-200 text-lg">AI-powered academic performance analysis</p>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Input Form */}
+        <div className="space-y-6">
+          <div className="glass-card rounded-3xl p-8">
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Student Details</h3>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-3">
+                    Student Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className="input-modern w-full"
+                    placeholder="Enter student name"
+                  />
+                </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Input Form */}
-            <div className="space-y-6">
-              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Student Information</h3>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Student Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={studentData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        placeholder="Enter student name"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-3">
+                    Attendance Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={studentData.attendanceRate}
+                    onChange={(e) => handleInputChange('attendanceRate', parseFloat(e.target.value))}
+                    className="input-modern w-full"
+                  />
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Attendance Rate (%)
-                      </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      Term Assessment 1 (out of 20)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={studentData.termAssessment1}
+                      onChange={(e) => handleInputChange('termAssessment1', parseFloat(e.target.value))}
+                      className="input-modern w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      Term Assessment 2 (out of 20)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={studentData.termAssessment2}
+                      onChange={(e) => handleInputChange('termAssessment2', parseFloat(e.target.value))}
+                      className="input-modern w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      Lab Marks Obtained
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={studentData.labTotal}
+                      value={studentData.labMarks}
+                      onChange={(e) => handleInputChange('labMarks', parseFloat(e.target.value))}
+                      className="input-modern w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      Lab Total Marks
+                    </label>
+                    <select
+                      value={studentData.labTotal}
+                      onChange={(e) => handleInputChange('labTotal', parseInt(e.target.value))}
+                      className="input-modern w-full"
+                    >
+                      <option value={20}>Out of 20</option>
+                      <option value={30}>Out of 30</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      Teacher Remark (out of 10)
+                    </label>
+                    <div className="relative">
                       <input
                         type="number"
                         min="0"
-                        max="100"
-                        value={studentData.attendanceRate}
-                        onChange={(e) => handleInputChange('attendanceRate', parseFloat(e.target.value))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        max="10"
+                        value={studentData.teacherRemark}
+                        onChange={(e) => handleInputChange('teacherRemark', parseFloat(e.target.value))}
+                        className="input-modern w-full pr-12"
                       />
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">/10</div>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      Remark Caption (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={studentData.remarkCaption || ''}
+                      onChange={(e) => {
+                        setStudentData(prev => ({
+                          ...prev,
+                          remarkCaption: e.target.value
+                        }));
+                      }}
+                      className="input-modern w-full"
+                      placeholder="e.g., Excellent work"
+                    />
+                  </div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Term Assessment 1 (out of 20)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="20"
-                          value={studentData.termAssessment1}
-                          onChange={(e) => handleInputChange('termAssessment1', parseFloat(e.target.value))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Term Assessment 2 (out of 20)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="20"
-                          value={studentData.termAssessment2}
-                          onChange={(e) => handleInputChange('termAssessment2', parseFloat(e.target.value))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        />
-                      </div>
-                    </div>
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-3">
+                    Previous Semester SGPA (Optional, out of 10)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.1"
+                      value={studentData.previousSGPA || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setStudentData(prev => ({
+                          ...prev,
+                          previousSGPA: value ? parseFloat(value) : undefined
+                        }));
+                      }}
+                      className="input-modern w-full pr-12"
+                      placeholder="e.g., 8.5"
+                    />
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">/10</div>
+                  </div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Lab Marks Obtained
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max={studentData.labTotal}
-                          value={studentData.labMarks}
-                          onChange={(e) => handleInputChange('labMarks', parseFloat(e.target.value))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Lab Total Marks
-                        </label>
-                        <select
-                          value={studentData.labTotal}
-                          onChange={(e) => handleInputChange('labTotal', parseInt(e.target.value))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        >
-                          <option value={20}>Out of 20</option>
-                          <option value={30}>Out of 30</option>
-                        </select>
-                      </div>
-                    </div>
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-3">
+                    Number of Assignments
+                  </label>
+                  <select
+                    value={numAssignments}
+                    onChange={(e) => handleNumAssignmentsChange(parseInt(e.target.value))}
+                    className="input-modern w-full"
+                  >
+                    <option value={3}>3 Assignments</option>
+                    <option value={4}>4 Assignments</option>
+                    <option value={5}>5 Assignments</option>
+                  </select>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-3">
-                          Teacher Remark (out of 10)
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-3">
+                    Assignment Marks (Each out of 10)
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {Array.from({ length: numAssignments }, (_, index) => (
+                      <div key={index}>
+                        <label className="block text-xs font-medium text-blue-200 mb-2">
+                          Assignment {index + 1}
                         </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            value={studentData.teacherRemark}
-                            onChange={(e) => handleInputChange('teacherRemark', parseFloat(e.target.value))}
-                            className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white/80"
-                          />
-                          <div className="absolute right-3 top-3 text-slate-400 text-sm">/10</div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-3">
-                          Remark Caption (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={studentData.remarkCaption || ''}
-                          onChange={(e) => {
-                            setStudentData(prev => ({
-                              ...prev,
-                              remarkCaption: e.target.value
-                            }));
-                          }}
-                          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white/80"
-                          placeholder="e.g., Excellent work"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-3">
-                        Previous Semester SGPA (Optional, out of 10)
-                      </label>
-                      <div className="relative">
                         <input
                           type="number"
                           min="0"
                           max="10"
-                          step="0.1"
-                          value={studentData.previousSGPA || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setStudentData(prev => ({
-                              ...prev,
-                              previousSGPA: value ? parseFloat(value) : undefined
-                            }));
-                          }}
-                          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white/80"
-                          placeholder="e.g., 8.5"
+                          step="0.5"
+                          value={studentData.assignments[index] || 0}
+                          onChange={(e) => handleAssignmentChange(index, parseFloat(e.target.value) || 0)}
+                          className="input-modern w-full"
+                          placeholder="0"
                         />
-                        <div className="absolute right-3 top-3 text-slate-400 text-sm">/10</div>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Number of Assignments
-                      </label>
-                      <select
-                        value={numAssignments}
-                        onChange={(e) => handleNumAssignmentsChange(parseInt(e.target.value))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                      >
-                        <option value={3}>3 Assignments</option>
-                        <option value={4}>4 Assignments</option>
-                        <option value={5}>5 Assignments</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Assignment Marks (Each out of 10)
-                      </label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {Array.from({ length: numAssignments }, (_, index) => (
-                          <div key={index}>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Assignment {index + 1}
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="10"
-                              step="0.5"
-                              value={studentData.assignments[index] || 0}
-                              onChange={(e) => handleAssignmentChange(index, parseFloat(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                              placeholder="0"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !studentData.name}
-                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                    >
-                      {isSubmitting ? (
-                        <div className="flex items-center justify-center space-x-2">
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          <span>Analyzing...</span>
-                        </div>
-                      ) : (
-                        'Predict Performance'
-                      )}
-                    </button>
+                    ))}
                   </div>
-                </form>
-              </div>
-            </div>
-
-            {/* Results */}
-            <div className="space-y-6">
-              {result ? (
-                <>
-                  <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                      Prediction Results for {result.student.name}
-                    </h3>
-
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                        <div className="text-2xl font-bold text-blue-700">
-                          {result.predictedCGPA.toFixed(2)}
-                        </div>
-                        <div className="text-sm font-medium text-blue-600">Predicted CGPA</div>
-                        <div className="text-xs text-blue-500">Out of 10.0</div>
-                      </div>
-                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                        <div className="text-2xl font-bold text-green-700">
-                          {result.predictedFinalExam.toFixed(0)}%
-                        </div>
-                        <div className="text-sm font-medium text-green-600">Final Exam Score</div>
-                        <div className="text-xs text-green-500">Predicted performance</div>
-                      </div>
-                    </div>
-
-                    <div className={`flex items-center justify-between p-4 rounded-lg border ${getRiskColor(result.riskLevel)}`}>
-                      <div className="flex items-center space-x-3">
-                        {getRiskIcon(result.riskLevel)}
-                        <div>
-                          <div className="font-semibold capitalize">{result.riskLevel} Risk Level</div>
-                          <div className="text-sm opacity-80">Academic performance risk</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold">{(result.confidence * 100).toFixed(0)}%</div>
-                        <div className="text-xs opacity-80">Confidence</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
-                    <h4 className="font-semibold text-gray-900 mb-4">AI Recommendations</h4>
-                    <div className="space-y-3">
-                      {result.recommendations.map((rec, index) => (
-                        <div key={index} className="flex items-start space-x-3">
-                          <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          <span className="text-sm text-gray-700">{rec}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="bg-gray-50 rounded-lg p-8 text-center border border-gray-200">
-                  <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready for Prediction</h3>
-                  <p className="text-gray-600">
-                    Enter student information and click "Predict Performance" to see AI-powered predictions and recommendations.
-                  </p>
                 </div>
-              )}
-            </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !studentData.name}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center space-x-3">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Analyzing Performance...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center space-x-2">
+                      <TrendingUp className="w-5 h-5" />
+                      <span>Predict Performance</span>
+                    </div>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
+        </div>
+
+        {/* Results */}
+        <div className="space-y-6">
+          {result ? (
+            <>
+              <div className="glass-card rounded-3xl p-8 floating-card">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">
+                      Results for {result.student.name}
+                    </h3>
+                    <p className="text-blue-200">AI-powered performance analysis</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 mb-8">
+                  <div className="stat-card">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="text-3xl font-bold text-gray-800 mb-1">
+                      {result.predictedCGPA.toFixed(2)}
+                    </div>
+                    <div className="text-gray-600 font-medium">Predicted CGPA</div>
+                    <div className="text-sm text-gray-500">Out of 10.0</div>
+                  </div>
+                  
+                  <div className="stat-card">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                        <Target className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="text-3xl font-bold text-gray-800 mb-1">
+                      {result.predictedFinalExam.toFixed(0)}%
+                    </div>
+                    <div className="text-gray-600 font-medium">Final Exam Score</div>
+                    <div className="text-sm text-gray-500">Expected performance</div>
+                  </div>
+                </div>
+
+                <div className={`glass-card rounded-2xl p-6 ${getRiskColor(result.riskLevel)} border-2`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                        {getRiskIcon(result.riskLevel)}
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold capitalize">{result.riskLevel} Risk Level</div>
+                        <div className="text-sm opacity-80">Academic performance assessment</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold">{(result.confidence * 100).toFixed(0)}%</div>
+                      <div className="text-sm opacity-80">AI Confidence</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card rounded-3xl p-8">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <h4 className="text-xl font-bold text-white">AI Recommendations</h4>
+                </div>
+                <div className="space-y-4">
+                  {result.recommendations.map((rec, index) => (
+                    <div key={index} className="flex items-start space-x-4 p-4 bg-white/10 rounded-xl backdrop-blur-sm">
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <CheckCircle className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-white font-medium">{rec}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <InsightsPanel
+                title="Structured insights"
+                subtitle="Generated on your device from this prediction — use Ask for interactive doubts."
+                body={buildLocalSingleStudentInsight(result)}
+                theme="dark"
+              />
+            </>
+          ) : (
+            <div className="glass-card rounded-3xl p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <TrendingUp className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">Ready for Analysis</h3>
+              <p className="text-blue-200 text-lg max-w-md mx-auto">
+                Fill in the student details and click "Predict Performance" to get AI-powered insights and recommendations.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Upload, Download, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { StudentData, PredictionResult } from '../types';
 import { predictPerformance } from '../utils/mlModel';
+import { buildCohortPayload } from '../utils/geminiExplain';
+import { buildLocalCohortInsight } from '../utils/localAssistant';
+import InsightsPanel from './InsightsPanel';
 
 
 interface BatchProcessorProps {
@@ -13,6 +16,11 @@ const BatchProcessor: React.FC<BatchProcessorProps> = ({ onBatchPredictions }) =
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const batchInsightPayload = useMemo(
+    () => (results.length > 0 ? buildCohortPayload(results, 'csv_batch') : null),
+    [results]
+  );
   
 const sampleData = [ 
     'name,attendanceRate,assignment1,assignment2,assignment3,assignment4,assignment5,termAssessment1,termAssessment2,labMarks,labTotal,teacherRemark,remarkCaption,previousSGPA', 
@@ -121,11 +129,7 @@ const sampleData = [
 
       for (let i = 0; i < students.length; i++) {
         const student = students[i];
-        const prediction = predictPerformance(student);
-        predictions.push(prediction);
-
-        // Add small delay for visual feedback
-        await new Promise(resolve => setTimeout(resolve, 200));
+        predictions.push(predictPerformance(student));
       }
 
       setResults(predictions);
@@ -195,35 +199,39 @@ const sampleData = [
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-6">
-          <div className="flex items-center space-x-4">
-            <div className="bg-white/20 p-3 rounded-xl">
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="glass-card rounded-3xl p-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-green-400/20 to-teal-500/20 rounded-full blur-3xl"></div>
+        <div className="relative z-10">
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl">
               <Upload className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Batch Processing</h2>
-              <p className="text-emerald-100 text-sm">Upload CSV files for bulk student analysis</p>
+              <h1 className="text-3xl font-bold text-white mb-1">Batch Processing</h1>
+              <p className="text-blue-200 text-lg">Upload CSV files for bulk student analysis</p>
             </div>
           </div>
         </div>
-        
-        <div className="p-8">
+      </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-            {/* Upload Section */}
-            <div className="space-y-6">
-              <div className="border-2 border-dashed border-emerald-300 rounded-xl p-8 text-center hover:border-emerald-400 transition-all duration-200 bg-gradient-to-br from-emerald-50 to-teal-50/50">
-                <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Upload className="w-10 h-10 text-emerald-600" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-3">
-                  Upload Student Data
-                </h3>
-                <p className="text-slate-600 mb-6 max-w-sm mx-auto">
-                  Upload a CSV file with student information to generate bulk predictions
-                </p>
+      <div className="glass-card rounded-3xl p-8">
+        <div className="space-y-8">
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          {/* Upload Section */}
+          <div className="space-y-6">
+            <div className="border-2 border-dashed border-white/30 rounded-xl p-8 text-center hover:border-white/50 transition-all duration-200 bg-white/5 backdrop-blur-sm">
+              <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Upload className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                Upload Student Data
+              </h3>
+              <p className="text-blue-200 mb-6 max-w-sm mx-auto">
+                Upload a CSV file with student information to generate bulk predictions
+              </p>
 
               <input
                 ref={fileInputRef}
@@ -234,20 +242,23 @@ const sampleData = [
                 disabled={isProcessing}
               />
 
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isProcessing}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-emerald-700 hover:to-teal-700 focus:ring-4 focus:ring-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  {isProcessing ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <span>Processing...</span>
-                    </div>
-                  ) : (
-                    'Select CSV File'
-                  )}
-                </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {isProcessing ? (
+                  <div className="flex items-center space-x-3">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Upload className="w-5 h-5" />
+                    <span>Select CSV File</span>
+                  </div>
+                )}
+              </button>
             </div>
 
               <div className="bg-gradient-to-br from-slate-50 to-blue-50/50 rounded-xl p-6 border border-slate-200/50">
@@ -334,6 +345,15 @@ const sampleData = [
                       Download Results CSV
                     </button>
                   </div>
+
+                  {batchInsightPayload && (
+                    <InsightsPanel
+                      title="Batch insights"
+                      subtitle="On-device summary for this upload — use Ask for deeper questions."
+                      body={buildLocalCohortInsight(batchInsightPayload)}
+                      theme="light"
+                    />
+                  )}
 
                   <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl p-6 max-h-96 overflow-y-auto border border-slate-200/50">
                     <h4 className="font-bold text-slate-800 mb-4 sticky top-0 bg-gradient-to-br from-slate-50 to-blue-50/30 flex items-center space-x-2">
