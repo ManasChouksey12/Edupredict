@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   Search,
@@ -8,9 +8,14 @@ import {
   CheckCircle2,
   LogOut,
   HelpCircle,
+  Save,
 } from 'lucide-react';
 import { Line, Bar } from 'react-chartjs-2';
 import type { StudentRecord } from '../../types/portal';
+import type { StudentData } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { useEduPortal } from '../../context/EduPortalContext';
+import { apiPortalPatchStudent } from '../../utils/api';
 import { predictPerformance } from '../../utils/mlModel';
 import { deriveFactorBars, deriveStrengthsWeaknesses } from '../../utils/studentInsights';
 
@@ -31,8 +36,82 @@ const StudentPerformanceDashboard: React.FC<StudentPerformanceDashboardProps> = 
   const { data, prediction, improvementActions, teacherNarrative, cgpaSemesters, cgpaHistory } =
     record;
 
+  const { token, user } = useAuth();
+  const { portalBackendActive, reloadFromBackend } = useEduPortal();
+  const saveEnabled = !!(portalBackendActive && token && user?.role === 'STUDENT');
+
+  const [persistBusy, setPersistBusy] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [nAssignments, setNAssignments] = useState(Math.min(5, Math.max(3, data.assignments.length || 3)));
+  const [asgDraft, setAsgDraft] = useState<number[]>(() => {
+    const a = [...data.assignments];
+    while (a.length < 5) a.push(8);
+    return a.slice(0, 5);
+  });
+  const [attIn, setAttIn] = useState(data.attendanceRate);
+  const [term1In, setTerm1In] = useState(data.termAssessment1);
+  const [term2In, setTerm2In] = useState(data.termAssessment2);
+  const [labMIn, setLabMIn] = useState(data.labMarks);
+  const [labTIn, setLabTIn] = useState(data.labTotal);
+  const [markIn, setMarkIn] = useState(data.teacherRemark);
+  const [sgpaIn, setSgpaIn] = useState(data.previousSGPA?.toString() ?? '');
   const [wAttendance, setWAttendance] = useState(data.attendanceRate);
   const [wExam, setWExam] = useState(Math.round((data.termAssessment1 + data.termAssessment2) / 2));
+
+  useEffect(() => {
+    const d = record.data;
+    setAttIn(d.attendanceRate);
+    setTerm1In(d.termAssessment1);
+    setTerm2In(d.termAssessment2);
+    setLabMIn(d.labMarks);
+    setLabTIn(d.labTotal);
+    setMarkIn(d.teacherRemark);
+    setSgpaIn(d.previousSGPA?.toString() ?? '');
+    const na = Math.min(5, Math.max(3, d.assignments.length || 3));
+    setNAssignments(na);
+    const a = [...d.assignments];
+    while (a.length < 5) a.push(8);
+    setAsgDraft(a.slice(0, 5));
+    setSaveMsg(null);
+    setWAttendance(d.attendanceRate);
+    setWExam(Math.round((d.termAssessment1 + d.termAssessment2) / 2));
+  }, [record]);
+
+  const persistAcademics = async () => {
+    if (!token || !saveEnabled) return;
+    const asg = asgDraft.slice(0, nAssignments);
+    const sum = asg.reduce((s, x) => s + x, 0);
+    const assignmentAverage = asg.length ? (sum / (asg.length * 10)) * 100 : 0;
+    const merged: StudentData = {
+      ...record.data,
+      attendanceRate: attIn,
+      assignments: asg,
+      assignmentAverage,
+      termAssessment1: term1In,
+      termAssessment2: term2In,
+      labMarks: labMIn,
+      labTotal: labTIn > 0 ? labTIn : record.data.labTotal,
+      teacherRemark: markIn,
+      previousSGPA: sgpaIn.trim() ? Number.parseFloat(sgpaIn) : undefined,
+      remarkCaption: record.data.remarkCaption,
+      name: record.data.name,
+    };
+    setPersistBusy(true);
+    setSaveMsg(null);
+    try {
+      await apiPortalPatchStudent(token, record.id, {
+        improvementActions: record.improvementActions,
+        teacherNarrative: record.teacherNarrative,
+        data: merged,
+      });
+      await reloadFromBackend();
+      setSaveMsg('Saved · prediction refreshed from server ML.');
+    } catch {
+      setSaveMsg('Could not save — check network or sign in again.');
+    } finally {
+      setPersistBusy(false);
+    }
+  };
 
   const whatIf = useMemo(() => {
     const d = {
@@ -120,7 +199,9 @@ const StudentPerformanceDashboard: React.FC<StudentPerformanceDashboardProps> = 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-lg sm:text-xl font-semibold tracking-tight">Student Performance Dashboard</h1>
-            <p className="text-blue-200/80 text-xs sm:text-sm mt-0.5">Personalized view · data from your teacher</p>
+            <p className="text-blue-200/80 text-xs sm:text-sm mt-0.5">
+              Personalized view · cohort data from DB — you can update your own academics when signed in via API.
+            </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
@@ -196,6 +277,151 @@ const StudentPerformanceDashboard: React.FC<StudentPerformanceDashboardProps> = 
             </div>
           </div>
         </section>
+
+        {saveEnabled && (
+          <section className="bg-white rounded-2xl border border-emerald-200/70 shadow-sm p-6 sm:p-8 space-y-5">
+            <div className="flex items-start gap-3 flex-wrap justify-between">
+              <div className="flex items-center gap-2">
+                <Save className="w-5 h-5 text-emerald-700" />
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Update your academics</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                    These fields feed server-side ML prediction. Username for students is always your roll number;
+                    teachers set name and programme when adding you.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={persistBusy}
+                onClick={() => void persistAcademics()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-semibold"
+              >
+                <Save className="w-4 h-4" />
+                {persistBusy ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                Attendance %
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={attIn}
+                  onChange={e => setAttIn(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                Term test 1 ( /20 typical )
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={term1In}
+                  onChange={e => setTerm1In(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                Term test 2 ( /20 typical )
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={term2In}
+                  onChange={e => setTerm2In(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                Lab marks
+                <input
+                  type="number"
+                  min={0}
+                  value={labMIn}
+                  onChange={e => setLabMIn(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                Lab total (max marks)
+                <input
+                  type="number"
+                  min={1}
+                  value={labTIn}
+                  onChange={e => setLabTIn(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                Self rating (teacher-style scale used in ML)
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={markIn}
+                  onChange={e => setMarkIn(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 flex flex-col gap-1 sm:col-span-2">
+                Previous SGPA (optional)
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.01}
+                  value={sgpaIn}
+                  onChange={e => setSgpaIn(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                Assignment scores (each 0–10)
+                <select
+                  value={nAssignments}
+                  onChange={e => setNAssignments(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                >
+                  <option value={3}>3</option>
+                  <option value={4}>4</option>
+                  <option value={5}>5</option>
+                </select>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {Array.from({ length: nAssignments }, (_, i) => (
+                  <label key={i} className="text-[11px] text-slate-600 flex flex-col gap-1">
+                    A{i + 1}
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      value={asgDraft[i]}
+                      onChange={e => {
+                        const v = Number(e.target.value);
+                        setAsgDraft(prev => {
+                          const nx = [...prev];
+                          nx[i] = v;
+                          return nx;
+                        });
+                      }}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+            {saveMsg && <p className="text-sm text-slate-600">{saveMsg}</p>}
+          </section>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">

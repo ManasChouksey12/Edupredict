@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard,
   Upload,
@@ -9,14 +9,48 @@ import {
   RotateCcw,
   BarChart3,
   Sparkles,
+  UserPlus,
+  Trash2,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useEduPortal } from '../../context/EduPortalContext';
 import TeacherStudentForm from './TeacherStudentForm';
 import Analytics from '../Analytics';
 import PredictionForm from '../PredictionForm';
 import BatchProcessor from '../BatchProcessor';
 import Dashboard from '../Dashboard';
-import type { PredictionResult } from '../../types';
+import type { PredictionResult, StudentData } from '../../types';
+import type { StudentRecord } from '../../types/portal';
+import { predictPerformance } from '../../utils/mlModel';
+import { buildCgpaHistory, DEFAULT_SEMESTERS } from '../../utils/cgpaHistory';
+
+function blankStudentRecord(): StudentRecord {
+  const defaults: StudentData = {
+    name: '',
+    attendanceRate: 85,
+    assignments: [8, 8, 8],
+    assignmentAverage: 0,
+    termAssessment1: 16,
+    termAssessment2: 17,
+    labMarks: 24,
+    labTotal: 30,
+    teacherRemark: 8,
+    remarkCaption: '',
+    previousSGPA: 8,
+  };
+  const pred = predictPerformance({ ...defaults, name: 'New student', id: 'draft' });
+  return {
+    id: '',
+    rollNumber: '',
+    program: '',
+    data: { ...defaults, assignmentAverage: pred.student.assignmentAverage },
+    prediction: { ...pred, timestamp: new Date() },
+    teacherNarrative: '',
+    improvementActions: [],
+    cgpaSemesters: [...DEFAULT_SEMESTERS],
+    cgpaHistory: buildCgpaHistory(pred.predictedCGPA),
+  };
+}
 
 interface TeacherPortalProps {
   onOpenHelp: () => void;
@@ -25,7 +59,18 @@ interface TeacherPortalProps {
 type TeacherView = 'roster' | 'edit' | 'import' | 'analytics' | 'workspace';
 
 const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
-  const { records, setRole, resetDemoData, importCsv, getRecord, upsertPredictions } = useEduPortal();
+  const {
+    records,
+    setRole,
+    resetDemoData,
+    importCsv,
+    getRecord,
+    upsertPredictions,
+    portalBackendActive,
+    deleteStudentRecord,
+  } = useEduPortal();
+  const auth = useAuth();
+
   const [view, setView] = useState<TeacherView>('roster');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [paste, setPaste] = useState('');
@@ -34,6 +79,15 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
     () => records.map(r => r.prediction)
   );
   const fileRef = useRef<HTMLInputElement>(null);
+  const [creatingNew, setCreatingNew] = useState(false);
+  const [draftKey, setDraftKey] = useState(0);
+
+  const blankTemplate = useMemo(() => blankStudentRecord(), []);
+
+  useEffect(() => {
+    if (!portalBackendActive) return;
+    setSessionPredictions([]);
+  }, [portalBackendActive]);
 
   const editing = editingId ? getRecord(editingId) : undefined;
 
@@ -43,9 +97,20 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
       ? (records.reduce((s, r) => s + r.prediction.predictedCGPA, 0) / records.length).toFixed(2)
       : '—';
 
-  const runImport = (text: string) => {
+  const rosterHint = portalBackendActive
+    ? `${records.length} students · MySQL (via JDBC) · supervised ML rescoring on save`
+    : `${records.length} students · offline mode (local browser only)`;
+
+  const workspaceTitle = portalBackendActive
+    ? 'Prediction workspace — API-connected'
+    : 'Prediction workspace (offline previews)';
+  const workspaceBody = portalBackendActive
+    ? 'Select a roll number to load saved metrics from MySQL (student fields are read-only here), predict with `/api/ml`, then Sync to save. Update marks in Roster.'
+    : 'Run predictions here, then sync into your local roster; sign in with the API for server-backed scoring.';
+
+  const runImport = async (text: string) => {
     setImportMsg(null);
-    const res = importCsv(text);
+    const res = await importCsv(text);
     if (res.ok) {
       setImportMsg(`Imported ${res.count} row(s).`);
       setPaste('');
@@ -55,16 +120,29 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
 
   const handleSinglePrediction = (result: PredictionResult) => {
     setSessionPredictions(prev => [result, ...prev]);
-    setImportMsg('Added 1 prediction to workspace (frontend mock).');
+    setImportMsg(
+      portalBackendActive
+        ? 'Added one prediction draft — Sync sends it via the supervised ML endpoints and roster batch API.'
+        : 'Added one prediction to the workspace preview (offline).'
+    );
   };
 
   const handleBatchPredictions = (predictions: PredictionResult[]) => {
+    if (predictions.length === 0) return;
     setSessionPredictions(prev => [...predictions, ...prev]);
-    setImportMsg(`Added ${predictions.length} predictions to workspace (frontend mock).`);
+    setImportMsg(
+      predictions.length <= 1
+        ? predictions.length +
+            ' prediction drafted.' +
+            (portalBackendActive ? ' Sync to persist via roster batch POST.' : '')
+        : `${predictions.length} predictions drafted.${
+            portalBackendActive ? ' Sync batches them through roster POST.' : ''
+          }`
+    );
   };
 
-  const syncWorkspaceToRoster = () => {
-    const count = upsertPredictions(sessionPredictions);
+  const syncWorkspaceToRoster = async () => {
+    const count = await upsertPredictions(sessionPredictions);
     setImportMsg(
       count > 0
         ? `Synced ${count} prediction(s) into teacher roster.`
@@ -73,10 +151,41 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
     setView('roster');
   };
 
+  const signOutTeacher = () => {
+    if (portalBackendActive) auth.logout();
+    else setRole(null);
+    setCreatingNew(false);
+  };
+
+  if (view === 'edit' && creatingNew) {
+    return (
+      <div className="min-h-screen bg-slate-100">
+        <TeacherStudentForm
+          key={`new-${draftKey}`}
+          creatingNew
+          record={blankTemplate}
+          savesToSpringApi={portalBackendActive}
+          onBack={() => {
+            setCreatingNew(false);
+            setView('roster');
+          }}
+        />
+      </div>
+    );
+  }
+
   if (view === 'edit' && editing) {
     return (
       <div className="min-h-screen bg-slate-100">
-        <TeacherStudentForm record={editing} onBack={() => { setView('roster'); setEditingId(null); }} />
+        <TeacherStudentForm
+          record={editing}
+          savesToSpringApi={portalBackendActive}
+          onBack={() => {
+            setView('roster');
+            setEditingId(null);
+            setCreatingNew(false);
+          }}
+        />
       </div>
     );
   }
@@ -91,7 +200,12 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
         <nav className="p-3 space-y-1 flex-1">
           <button
             type="button"
-            onClick={() => { setView('roster'); setImportMsg(null); }}
+            onClick={() => {
+              setCreatingNew(false);
+              setEditingId(null);
+              setView('roster');
+              setImportMsg(null);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               view === 'roster' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
@@ -101,7 +215,12 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
           </button>
           <button
             type="button"
-            onClick={() => { setView('import'); setImportMsg(null); }}
+            onClick={() => {
+              setCreatingNew(false);
+              setEditingId(null);
+              setView('import');
+              setImportMsg(null);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               view === 'import' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
@@ -111,7 +230,12 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
           </button>
           <button
             type="button"
-            onClick={() => { setView('analytics'); setImportMsg(null); }}
+            onClick={() => {
+              setCreatingNew(false);
+              setEditingId(null);
+              setView('analytics');
+              setImportMsg(null);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               view === 'analytics' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
@@ -121,7 +245,12 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
           </button>
           <button
             type="button"
-            onClick={() => { setView('workspace'); setImportMsg(null); }}
+            onClick={() => {
+              setCreatingNew(false);
+              setEditingId(null);
+              setView('workspace');
+              setImportMsg(null);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               view === 'workspace' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-300'
             }`}
@@ -142,16 +271,18 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
           <button
             type="button"
             onClick={() => {
-              if (confirm('Reset all records to built-in Indian demo data?')) resetDemoData();
+              if (portalBackendActive && !confirm('Delete every roster row in the backend (cannot undo)?')) return;
+              if (!portalBackendActive && !confirm('Clear all students from this offline roster?')) return;
+              void resetDemoData();
             }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-slate-800 text-left"
           >
             <RotateCcw className="w-4 h-4" />
-            Reset demo data
+            {portalBackendActive ? 'Clear roster (database)' : 'Clear offline roster'}
           </button>
           <button
             type="button"
-            onClick={() => setRole(null)}
+            onClick={signOutTeacher}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-slate-800 text-left text-red-300"
           >
             <LogOut className="w-4 h-4" />
@@ -166,10 +297,21 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
             <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Cohort overview</h1>
-                <p className="text-slate-500 text-sm mt-1">
-                  {records.length} students · mock Indian roster · edits persist locally
-                </p>
+                <p className="text-slate-500 text-sm mt-1">{rosterHint}</p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftKey(k => k + 1);
+                  setCreatingNew(true);
+                  setEditingId(null);
+                  setView('edit');
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add student
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
@@ -198,11 +340,19 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
                     <th className="px-5 py-3">Roll</th>
                     <th className="px-5 py-3">CGPA</th>
                     <th className="px-5 py-3">Risk</th>
-                    <th className="px-5 py-3 w-28"></th>
+                    <th className="px-5 py-3 w-24">Edit</th>
+                    <th className="px-5 py-3 w-24">Delete</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map(r => (
+                  {records.length === 0 ?
+                    <tr>
+                      <td className="px-5 py-14 text-center text-slate-500 text-sm" colSpan={6}>
+                        No students in the roster yet. Use <strong>Add student</strong> or <strong>Import CSV</strong> so
+                        data is loaded from your database-backed roster API.
+                      </td>
+                    </tr>
+                  : records.map(r => (
                     <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50/80">
                       <td className="px-5 py-3 font-medium text-slate-900">{r.data.name}</td>
                       <td className="px-5 py-3 font-mono text-slate-600">{r.rollNumber}</td>
@@ -226,6 +376,7 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
                         <button
                           type="button"
                           onClick={() => {
+                            setCreatingNew(false);
                             setEditingId(r.id);
                             setView('edit');
                           }}
@@ -233,6 +384,20 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                           Edit
+                        </button>
+                      </td>
+                      <td className="px-5 py-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const label = r.data.name?.trim() || r.rollNumber;
+                            if (!confirm(`Remove ${label} from the roster?`)) return;
+                            void deleteStudentRecord(r.id);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
                         </button>
                       </td>
                     </tr>
@@ -263,12 +428,26 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
               <code className="text-xs bg-slate-100 px-1 rounded">program</code>,{' '}
               <code className="text-xs bg-slate-100 px-1 rounded">attendanceRate</code>, assignment columns, term
               tests, lab, teacherRemark, etc. Rows merge by roll number or name.
+              {portalBackendActive && (
+                <>
+                  {' '}
+                  With the API enabled, import uses{' '}
+                  <code className="text-xs bg-slate-100 px-1 rounded">POST /api/portal/students/batch</code> to merge
+                  rows.
+                </>
+              )}
             </p>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={async e => {
-              const f = e.target.files?.[0];
-              if (f) runImport(await f.text());
-              e.target.value = '';
-            }} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={async e => {
+                const f = e.target.files?.[0];
+                if (f) await runImport(await f.text());
+                e.target.value = '';
+              }}
+            />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -286,7 +465,7 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
             />
             <button
               type="button"
-              onClick={() => runImport(paste)}
+              onClick={() => void runImport(paste)}
               className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
             >
               Import from text
@@ -303,14 +482,12 @@ const TeacherPortal: React.FC<TeacherPortalProps> = ({ onOpenHelp }) => {
           <div className="p-6 sm:p-10 space-y-8">
             <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="font-semibold text-indigo-950">Frontend-only prediction workspace</h2>
-                <p className="text-sm text-indigo-800/80">
-                  Run single and batch predictions, then sync them into the teacher roster.
-                </p>
+                <h2 className="font-semibold text-indigo-950">{workspaceTitle}</h2>
+                <p className="text-sm text-indigo-800/80">{workspaceBody}</p>
               </div>
               <button
                 type="button"
-                onClick={syncWorkspaceToRoster}
+                onClick={() => void syncWorkspaceToRoster()}
                 className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500"
               >
                 Sync to roster

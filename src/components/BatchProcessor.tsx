@@ -2,6 +2,8 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Upload, Download, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { StudentData, PredictionResult } from '../types';
 import { predictPerformance } from '../utils/mlModel';
+import { apiMlPredictBatch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import { buildCohortPayload } from '../utils/geminiExplain';
 import { buildLocalCohortInsight } from '../utils/localAssistant';
 import InsightsPanel from './InsightsPanel';
@@ -12,6 +14,7 @@ interface BatchProcessorProps {
 }
 
 const BatchProcessor: React.FC<BatchProcessorProps> = ({ onBatchPredictions }) => {
+  const { token, offlineDemo, authReady } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<PredictionResult[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -124,12 +127,16 @@ const sampleData = [
         throw new Error('No valid student data found in the CSV file');
       }
 
-      // Process predictions with delay for UX
-      const predictions: PredictionResult[] = [];
-
-      for (let i = 0; i < students.length; i++) {
-        const student = students[i];
-        predictions.push(predictPerformance(student));
+      const useBackend = !!(token && authReady && !offlineDemo);
+      let predictions: PredictionResult[];
+      try {
+        if (useBackend && token) {
+          predictions = await apiMlPredictBatch(token, students);
+        } else {
+          predictions = students.map(student => predictPerformance(student));
+        }
+      } catch {
+        predictions = students.map(student => predictPerformance(student));
       }
 
       setResults(predictions);

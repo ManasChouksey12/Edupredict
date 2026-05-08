@@ -13,8 +13,8 @@ const RoleSelect: React.FC = () => {
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">EduPredict Portal</h1>
         <p className="text-slate-400 mt-4 text-sm sm:text-base leading-relaxed">
-          Role-based demo: teachers manage cohorts, upload data, and assign improvements. Students see their personal
-          dashboard, teacher remarks, and charts. All data is mock / local to this browser.
+          Offline mode: pick a role to explore the UI. Roster data stays in this browser until you sign in — then the
+          Spring Boot API and database are the source of truth.
         </p>
       </div>
 
@@ -29,7 +29,7 @@ const RoleSelect: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Teacher / Admin</h2>
           <p className="text-slate-400 text-sm leading-relaxed mb-6">
-            View all students, edit profiles, teacher narrative, improvement tasks, and import CSV rows.
+            Full roster CRUD: add/edit/delete students, CSV import, analytics, and prediction workspace.
           </p>
           <span className="inline-flex items-center gap-2 text-indigo-300 text-sm font-semibold">
             Enter portal
@@ -47,7 +47,7 @@ const RoleSelect: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Student</h2>
           <p className="text-slate-400 text-sm leading-relaxed mb-6">
-            Open your performance dashboard: CGPA, risk, charts, teacher-assigned actions, and what-if sliders.
+            Open your performance dashboard: CGPA, risk, charts, teacher narrative, and improvement actions.
           </p>
           <span className="inline-flex items-center gap-2 text-emerald-300 text-sm font-semibold">
             Enter portal
@@ -57,7 +57,8 @@ const RoleSelect: React.FC = () => {
       </div>
 
       <p className="text-slate-600 text-xs mt-12 max-w-md text-center">
-        Demo only — no server. Data persists in localStorage until you clear site data or use Reset in the teacher panel.
+        Prefer live data? Use <strong className="text-slate-500">Sign in</strong> on the login page while the backend
+        is running on port 8080 instead of offline mode here.
       </p>
     </div>
   );

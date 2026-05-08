@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
-import type { StudentRecord } from '../../types/portal';
+import type { StudentRecord, ImprovementAction } from '../../types/portal';
 import { useEduPortal } from '../../context/EduPortalContext';
 import type { StudentData } from '../../types';
+import { predictPerformance } from '../../utils/mlModel';
+import { buildCgpaHistory, DEFAULT_SEMESTERS } from '../../utils/cgpaHistory';
+
+function impId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 interface TeacherStudentFormProps {
   record: StudentRecord;
   onBack: () => void;
+  /** New roster row — POST `/api/portal/students` (or local append offline). */
+  creatingNew?: boolean;
+  savesToSpringApi?: boolean;
 }
 
-const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack }) => {
-  const { updateRecord, addImprovement, removeImprovement, getRecord } = useEduPortal();
-  const live = getRecord(record.id) ?? record;
+const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({
+  record,
+  onBack,
+  creatingNew = false,
+  savesToSpringApi = false,
+}) => {
+  const { updateRecord, addImprovement, removeImprovement, getRecord, createStudentRecord } = useEduPortal();
+  const live = creatingNew ? record : getRecord(record.id) ?? record;
   const d = live.data;
+
+  const [draftImprovements, setDraftImprovements] = useState<ImprovementAction[]>([]);
 
   const [name, setName] = useState(d.name);
   const [rollNumber, setRollNumber] = useState(live.rollNumber);
@@ -25,7 +41,7 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
   const [teacherRemarkNum, setTeacherRemarkNum] = useState(d.teacherRemark);
   const [remarkCaption, setRemarkCaption] = useState(d.remarkCaption || '');
   const [previousSGPA, setPreviousSGPA] = useState(d.previousSGPA?.toString() || '');
-  const [narrative, setNarrative] = useState(record.teacherNarrative);
+  const [narrative, setNarrative] = useState(live.teacherNarrative);
   const [nAssignments, setNAssignments] = useState(Math.min(5, Math.max(3, d.assignments.length || 3)));
   const [assignments, setAssignments] = useState<number[]>(() => {
     const a = [...d.assignments];
@@ -33,14 +49,24 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
     return a.slice(0, 5);
   });
   const [newImp, setNewImp] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const handleSave = () => {
+  const improvementList = creatingNew ? draftImprovements : live.improvementActions;
+
+  const handleSave = async () => {
+    const trimmedName = name.trim();
+    const roll = rollNumber.trim();
+    if (!trimmedName || !roll) {
+      window.alert('Name and roll number are required.');
+      return;
+    }
+
     const asg = assignments.slice(0, nAssignments);
     const sum = asg.reduce((s, x) => s + x, 0);
     const assignmentAverage = asg.length ? (sum / (asg.length * 10)) * 100 : 0;
     const nextData: StudentData = {
       ...d,
-      name,
+      name: trimmedName,
       attendanceRate: attendance,
       assignments: asg,
       assignmentAverage,
@@ -52,13 +78,71 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
       remarkCaption: remarkCaption || undefined,
       previousSGPA: previousSGPA ? parseFloat(previousSGPA) : undefined,
     };
-    updateRecord(live.id, {
-      data: nextData,
-      rollNumber,
-      program,
-      teacherNarrative: narrative,
-    });
-    onBack();
+
+    const baseActions =
+      creatingNew ?
+        draftImprovements
+      : (getRecord(live.id) ?? live).improvementActions;
+
+    const safeActions = baseActions.map((a, idx) => ({
+      id: a.id || impId(`imp-${idx}`),
+      text: a.text,
+    }));
+
+    setBusy(true);
+    try {
+      if (creatingNew) {
+        const pred = predictPerformance({ ...nextData, id: '' });
+        const created: StudentRecord = {
+          id: '',
+          rollNumber: roll,
+          program: program.trim() || 'Program not specified',
+          data: pred.student,
+          prediction: { ...pred, timestamp: new Date() },
+          teacherNarrative: narrative.trim(),
+          improvementActions: safeActions,
+          cgpaSemesters: [...DEFAULT_SEMESTERS],
+          cgpaHistory: buildCgpaHistory(pred.predictedCGPA),
+        };
+        await createStudentRecord(created);
+        if (savesToSpringApi) {
+          window.alert(
+            `Student saved.\n\nThey can log in now:\n  Username: ${roll.trim()}\n  Password: ${roll.trim()} (same as roll number)\n\nOn the login page enter these, choose Student role, then use "Update your academics" on the dashboard.`
+          );
+        }
+        onBack();
+        return;
+      }
+
+      updateRecord(live.id, {
+        data: nextData,
+        rollNumber: roll,
+        program: program.trim(),
+        teacherNarrative: narrative.trim(),
+      });
+      onBack();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRemoveImprovement = (actionId: string) => {
+    if (creatingNew) {
+      setDraftImprovements(prev => prev.filter(a => a.id !== actionId));
+    } else {
+      removeImprovement(live.id, actionId);
+    }
+  };
+
+  const onAddImprovementLine = () => {
+    const t = newImp.trim();
+    if (!t) return;
+    if (creatingNew) {
+      setDraftImprovements(prev => [...prev, { id: impId('imp'), text: t }]);
+    } else {
+      addImprovement(live.id, t);
+    }
+    setNewImp('');
   };
 
   return (
@@ -72,9 +156,15 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
         Back to roster
       </button>
 
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Edit student</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-2">
+        {creatingNew ? 'Add student' : 'Edit student'}
+      </h1>
       <p className="text-slate-500 text-sm mb-8">
-        Changes save to this browser only. Numeric fields feed the same prediction model as before.
+        {savesToSpringApi ?
+          creatingNew ?
+            'Creates a roster row via POST /api/portal/students — the API recomputes CGPA/risk with the supervised model.'
+          : 'Saving sends PUT /api/portal/students/:id; the server recomputes prediction from your metrics.'
+        : 'Saving keeps data in this browser only (offline mode).' }
       </p>
 
       <div className="space-y-8 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
@@ -255,7 +345,7 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
         <div>
           <h3 className="text-sm font-semibold text-slate-900 mb-3">Improvement actions</h3>
           <ul className="space-y-2 mb-4">
-            {live.improvementActions.map(a => (
+            {improvementList.map(a => (
               <li
                 key={a.id}
                 className="flex items-start gap-2 text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100"
@@ -263,7 +353,7 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
                 <span className="flex-1">{a.text}</span>
                 <button
                   type="button"
-                  onClick={() => removeImprovement(live.id, a.id)}
+                  onClick={() => onRemoveImprovement(a.id)}
                   className="p-1 text-red-600 hover:bg-red-50 rounded"
                   aria-label="Remove"
                 >
@@ -281,12 +371,7 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
             />
             <button
               type="button"
-              onClick={() => {
-                if (newImp.trim()) {
-                  addImprovement(live.id, newImp.trim());
-                  setNewImp('');
-                }
-              }}
+              onClick={onAddImprovementLine}
               className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500"
             >
               <Plus className="w-4 h-4" />
@@ -298,11 +383,12 @@ const TeacherStudentForm: React.FC<TeacherStudentFormProps> = ({ record, onBack 
         <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
           <button
             type="button"
-            onClick={handleSave}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+            onClick={() => void handleSave()}
+            disabled={busy}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            Save & close
+            {busy ? 'Saving…' : creatingNew ? 'Create student' : 'Save & close'}
           </button>
           <button type="button" onClick={onBack} className="px-6 py-2.5 text-sm text-slate-600 hover:text-slate-900">
             Cancel
